@@ -1,0 +1,27 @@
+import paramiko
+
+def lambda_handler(event, context):
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    
+    # Ensure id_rsa.pem is packaged with the Lambda OR stored in /tmp after download from Secrets/SSM
+    ssh.connect(
+        hostname='54.196.120.228',
+        username='root',
+        key_filename='id_rsa.pem'
+    )
+
+    stdin, stdout, stderr = ssh.exec_command('ansible-playbook playbook.yml')
+    
+    output = stdout.read().decode()
+    error = stderr.read().decode()
+    
+    ssh.close()
+
+    print("done")  # Lambda logs
+    
+    return {
+        "output": output,
+        "error": error
+    }
+
