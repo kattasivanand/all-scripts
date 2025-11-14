@@ -1,0 +1,67 @@
+pipeline {
+    agent any 
+
+    stages {
+        stage('Cleaning Workspace') {
+            steps {
+                cleanWs()
+            }
+        }
+
+        stage('Checkout from Git') {
+            steps {
+                git branch: 'main', url: 'https://github.com/kattasivanand/2nd10WeeksofCloudOps-main.git'
+            }
+        }
+
+        stage("Docker Image Build") {
+            steps {
+                script {
+                    dir('client') {
+                        sh 'docker system prune -f'
+                        sh 'docker container prune -f'
+                        // Build Docker image
+                        sh 'docker build -t backendeks .'
+                    }
+                }
+            }
+        }
+
+        stage("ECR Image Pushing") {
+            steps {
+                script {
+                    sh '''
+                    aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 948451198917.dkr.ecr.ap-south-1.amazonaws.com
+                    docker tag backendeks:latest 948451198917.dkr.ecr.ap-south-1.amazonaws.com/backendeks:${BUILD_NUMBER}
+                    docker push 948451198917.dkr.ecr.ap-south-1.amazonaws.com/backendeks:${BUILD_NUMBER}
+                    '''
+                }
+            }
+        }
+
+        stage('Update Deployment file') {
+            environment {
+                GIT_REPO_NAME = "2nd10WeeksofCloudOps-main"
+                GIT_USER_NAME = "kattasivanand"
+            }
+            steps {
+                dir('kubernetes-files') {
+                    withCredentials([string(credentialsId: 'my-git-pattoken', variable: 'git_token')]) {
+                        sh '''
+                            git config user.email "kattasivanand123@gmail.com"
+                            git config user.name "kattasivanand"
+                            echo "Updating deployment to build number: ${BUILD_NUMBER}"
+                            
+                            sed -i "s#image:.*#image: 948451198917.dkr.ecr.ap-south-1.amazonaws.com/backendeks:${BUILD_NUMBER}#g" backend-deployment.yaml
+
+                            git add backend-deployment.yaml
+                            git commit -m "Update deployment Image to version ${BUILD_NUMBER}"
+                            git push https://${git_token}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME} HEAD:main
+                        '''
+                    }
+                }
+            }
+        }
+    }
+}
+
