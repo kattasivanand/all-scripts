@@ -1,0 +1,84 @@
+---
+- name: Install and configure Node Exporter on all nodes
+  hosts: all
+  become: yes
+  vars:
+    node_exporter_version: "1.6.1"
+    node_exporter_user: "nodeusr"
+    node_exporter_dir: "/usr/local/bin"
+    node_exporter_service: "/etc/systemd/system/node_exporter.service"
+
+  tasks:
+
+    - name: Ensure required packages are installed
+      package:
+        name: tar
+        state: present
+
+    - name: Download Node Exporter tarball
+      get_url:
+        url: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+        dest: "/tmp/node_exporter.tar.gz"
+        mode: '0644'
+
+    - name: Extract Node Exporter binary
+      unarchive:
+        src: "/tmp/node_exporter.tar.gz"
+        dest: "/tmp/"
+        remote_src: yes
+
+    - name: Move Node Exporter binary to /usr/local/bin
+      copy:
+        src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
+        dest: "{{ node_exporter_dir }}/node_exporter"
+        mode: '0755'
+        owner: root
+        group: root
+        remote_src: yes
+
+    - name: Create node_exporter user
+      user:
+        name: "{{ node_exporter_user }}"
+        shell: /bin/false
+        system: yes
+        create_home: no
+
+    - name: Create systemd service file for Node Exporter
+      copy:
+        dest: "{{ node_exporter_service }}"
+        content: |
+          [Unit]
+          Description=Node Exporter
+          After=network.target
+
+          [Service]
+          User={{ node_exporter_user }}
+          Group={{ node_exporter_user }}
+          Type=simple
+          ExecStart={{ node_exporter_dir }}/node_exporter
+          Restart=on-failure
+
+          [Install]
+          WantedBy=multi-user.target
+        mode: '0644'
+
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Enable and start Node Exporter
+      systemd:
+        name: node_exporter
+        enabled: yes
+        state: started
+
+    - name: Verify Node Exporter is running
+      uri:
+        url: "http://localhost:9100/metrics"
+        return_content: yes
+      register: metrics_output
+      failed_when: "'node_memory_MemTotal_bytes' not in metrics_output.content"
+
+    - debug:
+        msg: "✅ Node Exporter is running successfully on {{ inventory_hostname }}"
+
