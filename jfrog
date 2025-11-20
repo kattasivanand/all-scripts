@@ -1,0 +1,144 @@
+---------------------------- JFROG Install ---------------
+Why Only Jfrog
+Jfrog Artifactory?
+What is Artifact
+what is artifact Repository?
+why artifact Repository?
+Type of packages it supports:
+How to setup Artifactory server on AWS 
+Artifact Deployment from maven to Jfrog
+Artifactory Integration with jenkins
+
+repository management tool
+===========================
+ - Repository management tools helps development teams create, maintain, and track their software packages.
+
+Options
+-------
+1. Jfrog Artifact
+2. Nexus
+3. Apache Archiva
+4. Nuget
+5. github
+6. s3
+7. ecr
+
+Why Only Jfrog
+--------------
+But jfrog supports wide range of formets and types.
+Eg:- 
+     python repo
+     chef repo
+     puppet repo
+     Apt repo
+     yum repo
+     docker repo
+     rpm repo
+     maven repo...etc
+
+- it is a repository management tool
+- A universal artifact repository manager
+- JFrog Artifactory is a repository manager that supports all available software package types
+- Artifactory, the first-in-class binary repository management
+
+Jfrog Artifactory?
+==================
+Jfrog Artifactory is a tool used in devops methodology to store artifacts (readily deployable code)
+
+What is Artifact
+----------------
+The files that contain both compiled code and resources that are used to compile them are know as artifact. 
+- They are readily deployable files.
+								     	
+- source code  -->  Build Tools  -->  Compilation  -->  Binary code -->  Dependencys/resources -->  Artifact ---> Deploy
+
+- in java an artifacts would be jar, war, ear...etc file
+- in .net an artifacts would be .dll file
+
+
+ 								    	 
+what is artifact Repository?
+----------------------------
+- An artifact repository is a repository which can store multiple different versions of artifacts.each
+  time the war or tar.gz file is created. it stored in a server dedicated for the artifacts.
+
+
+in real-time in the above process if you have any error in test env, we will rollback to version control to fix it. instead of that if you store artifacts in repo we can rollback to prevision version.
+
+#########:"Install":##################
+
+wget https://releases.jfrog.io/artifactory/bintray-artifactory/org/artifactory/oss/jfrog-artifactory-oss/7.68.20/jfrog-artifactory-oss-7.68.20-linux.tar.gz
+
+tar -xvzf jfrog-artifactory-oss-7.68.20-linux.tar.gz #untar
+
+cd artifactory-oss-7.68.20
+
+cd app
+cd bin
+sh artifactory.sh start
+
+http://publicip:8081/ or http://publicip:8082
+  http://<PUBLIC_IP_Address>:8081
+
+After Login we need to Provide 
+
+Username as admin
+Password as password 
+
+#Note:we have to change it password after loggedin
+
+###:Jenkins:####
+
+step-1 Install Artifactory plugin 
+
+       
+step-2 Configure Artifactory server credentials
+          Manage Jenkins -> Configure System -> Artifactory (or) Jfrog (Note: after configure serverID it will take care of URL and authentication of JFROG)
+          and give username and password.
+Step-3 create pipeline job
+
+
+pipeline {
+    agent any
+
+    stages {
+        stage('stage-1') {
+            steps {
+               git branch: 'main', url: 'https://github.com/CloudTechDevOps/project-1-maven-jenkins-CICD-docker-eks-.git'
+            }
+        }
+   
+        stage('clean') {
+            steps {
+              sh  'mvn clean'
+            }
+        }
+        
+        stage('test') {
+            steps {
+              sh  'mvn test'
+            }
+        }
+        stage('install') {
+            steps {
+               sh  'mvn install'
+            }
+        }
+        
+        stage('Push artifacts into artifactory') {
+            steps {
+              rtUpload (
+                serverId: 'jfrog_server',   // Jenkins crendiential inside server id 
+                spec: '''{
+                      "files": [
+                        {
+                          "pattern": "*.war",
+                           "target": "test/"  //repository name
+                        }
+                    ]
+                }'''
+              )
+          }
+        }
+}
+}
