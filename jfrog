@@ -133,7 +133,7 @@ pipeline {
                       "files": [
                         {
                           "pattern": "*.war",
-                           "target": "test/"  //repository name
+                           "target": "test/"  // jfrog repository name
                         }
                     ]
                 }'''
